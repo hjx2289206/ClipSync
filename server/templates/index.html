@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剪贴板同步</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            background-color: #4a6bdf;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .auth-container {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .auth-tab.active {
+            border-bottom: 2px solid #4a6bdf;
+            color: #4a6bdf;
+            font-weight: bold;
+        }
+        .auth-form {
+            display: none;
+        }
+        .auth-form.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4a6bdf;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3a5bc9;
+        }
+        .clipboard-container {
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .clipboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .clipboard-list {
+            margin-top: 20px;
+        }
+        .clipboard-item {
+            background-color: #f9f9f9;
+            border-left: 3px solid #4a6bdf;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            position: relative;
+        }
+        .clipboard-content {
+            word-break: break-all;
+            margin-bottom: 5px;
+        }
+        .clipboard-time {
+            font-size: 12px;
+            color: #888;
+        }
+        .clipboard-actions {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+        }
+        .clipboard-actions button {
+            padding: 5px 10px;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+        .new-clipboard {
+            margin-top: 20px;
+        }
+        .new-clipboard textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            min-height: 100px;
+            margin-bottom: 10px;
+        }
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .user-info {
+            text-align: right;
+            margin-bottom: 10px;
+        }
+        .logout-btn {
+            background-color: #dc3545;
+        }
+        .logout-btn:hover {
+            background-color: #c82333;
+        }
+        .copy-btn {
+            background-color: #28a745;
+        }
+        .copy-btn:hover {
+            background-color: #218838;
+        }
+        .delete-btn {
+            background-color: #dc3545;
+        }
+        .delete-btn:hover {
+            background-color: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>剪贴板同步工具</h1>
+        </header>
+        
+        <div id="authContainer" class="auth-container">
+            <div class="auth-tabs">
+                <div class="auth-tab active" data-tab="login">登录</div>
+                <div class="auth-tab" data-tab="register">注册</div>
+            </div>
+            
+            <div id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginUsername">用户名</label>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码">
+                </div>
+                <button id="loginBtn">登录</button>
+                <div id="loginStatus" class="status-message"></div>
+            </div>
+            
+            <div id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label for="registerUsername">用户名</label>
+                    <input type="text" id="registerUsername" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">密码</label>
+                    <input type="password" id="registerPassword" placeholder="请输入密码">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">确认密码</label>
+                    <input type="password" id="confirmPassword" placeholder="请再次输入密码">
+                </div>
+                <button id="registerBtn">注册</button>
+                <div id="registerStatus" class="status-message"></div>
+            </div>
+        </div>
+        
+        <div id="clipboardContainer" class="clipboard-container">
+            <div class="user-info">
+                <span id="userWelcome">欢迎，</span>
+                <button id="logoutBtn" class="logout-btn">退出登录</button>
+            </div>
+            
+            <div class="clipboard-header">
+                <h2>我的剪贴板</h2>
+                
+                <button id="refreshBtn">刷新</button>
+                <button id="clientsBtn">查看客户端</button>
+                <button id="manageClientsBtn">管理客户端</button>
+            </div>
+            
+            <div class="new-clipboard">
+                <h3>添加新内容</h3>
+                <textarea id="newClipboardContent" placeholder="输入要添加到剪贴板的内容"></textarea>
+                <button id="addClipboardBtn">添加到剪贴板</button>
+                <div id="addStatus" class="status-message"></div>
+            </div>
+            
+            <div class="clipboard-list" id="clipboardList">
+                <!-- 剪贴板内容将在这里动态生成 -->
+            </div>
+            
+            <!-- 模拟输入功能区域 -->
+            <div class="simulate-typing-container" style="margin-top: 20px; display: none;" id="simulateTypingContainer">
+                <h3>发送模拟输入指令</h3>
+                <div class="form-group">
+                    <label for="clientSelect">选择客户端:</label>
+                    <select id="clientSelect" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+                </div>
+                <div class="form-group">
+                    <label for="typingContent">输入内容:</label>
+                    <textarea id="typingContent" placeholder="输入要模拟键盘输入的内容" style="width: 100%; min-height: 80px;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="typingSpeed">输入速度(ms):</label>
+                    <input type="number" id="typingSpeed" value="100" min="10" max="500" style="width: 100px;">
+                </div>
+                <button id="sendTypingBtn" style="background-color: #28a745;">发送模拟输入指令</button>
+                <div id="typingStatus" class="status-message"></div>
+            </div>
+        </div>
+        
+        <!-- 客户端管理对话框 -->
+        <div id="clientManagementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="background-color: white; width: 400px; margin: 100px auto; padding: 20px; border-radius: 5px;">
+                <h3>管理客户端</h3>
+                <div class="form-group">
+                    <label for="clientSelectModal">选择客户端:</label>
+                    <select id="clientSelectModal" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+                </div>
+                <div class="form-group">
+                    <label for="clientNameInput">客户端名称:</label>
+                    <input type="text" id="clientNameInput" placeholder="输入新名称" style="width: 100%; padding: 8px;">
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: space-between;">
+                    <button id="updateClientNameBtn" style="background-color: #4a6bdf;">修改名称</button>
+                    <button id="deleteClientBtn" style="background-color: #dc3545;">删除客户端</button>
+                    <button id="closeClientModalBtn">关闭</button>
+                </div>
+                <div id="clientManagementStatus" class="status-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 全局变量
+            const serverUrl = window.location.origin;
+            const typingSpeed = 100;
+            
+            // 元素引用
+            const authContainer = document.getElementById('authContainer');
+            const clipboardContainer = document.getElementById('clipboardContainer');
+            const authTabs = document.querySelectorAll('.auth-tab');
+            const authForms = document.querySelectorAll('.auth-form');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            const loginBtn = document.getElementById('loginBtn');
+            const registerBtn = document.getElementById('registerBtn');
+            const loginStatus = document.getElementById('loginStatus');
+            const registerStatus = document.getElementById('registerStatus');
+            const userWelcome = document.getElementById('userWelcome');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const addClipboardBtn = document.getElementById('addClipboardBtn');
+            const newClipboardContent = document.getElementById('newClipboardContent');
+            const addStatus = document.getElementById('addStatus');
+            const clipboardList = document.getElementById('clipboardList');
+            
+            // 模拟输入元素
+            const clientsBtn = document.getElementById('clientsBtn');
+            const simulateTypingContainer = document.getElementById('simulateTypingContainer');
+            const clientSelect = document.getElementById('clientSelect');
+            const typingContent = document.getElementById('typingContent');
+            const typingSpeedInput = document.getElementById('typingSpeed');
+            const sendTypingBtn = document.getElementById('sendTypingBtn');
+            const typingStatus = document.getElementById('typingStatus');
+            
+            // 客户端管理元素
+            const manageClientsBtn = document.getElementById('manageClientsBtn');
+            const clientManagementModal = document.getElementById('clientManagementModal');
+            const clientSelectModal = document.getElementById('clientSelectModal');
+            const clientNameInput = document.getElementById('clientNameInput');
+            const updateClientNameBtn = document.getElementById('updateClientNameBtn');
+            const deleteClientBtn = document.getElementById('deleteClientBtn');
+            const closeClientModalBtn = document.getElementById('closeClientModalBtn');
+            const clientManagementStatus = document.getElementById('clientManagementStatus');
+            
+            // 工具函数 - 显示状态消息
+            function showStatus(element, message, type) {
+                element.textContent = message;
+                element.className = 'status-message';
+                if (type === 'error') {
+                    element.classList.add('status-error');
+                } else if (type === 'success') {
+                    element.classList.add('status-success');
+                }
+            }
+            
+            // 加载客户端列表（用于模拟输入）
+            function loadClientsList() {
+                fetch(`${serverUrl}/api/clients`, {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('获取客户端列表失败');
+                    }
+                    return response.json();
+                })
+                .then(clients => {
+                    clientSelect.innerHTML = '';
+                    
+                    if (clients.length === 0) {
+                        const option = document.createElement('option');
+                        option.textContent = '没有在线客户端';
+                        option.disabled = true;
+                        clientSelect.appendChild(option);
+                        sendTypingBtn.disabled = true;
+                    } else {
+                        clients.forEach(client => {
+                            const option = document.createElement('option');
+                            option.value = client.client_id;
+                            option.textContent = `${client.name || '客户端 '+client.client_id.split('-')[0]} (最后在线: ${new Date(client.last_seen).toLocaleString()})`;
+                            clientSelect.appendChild(option);
+                        });
+                        sendTypingBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取客户端列表错误:', error);
+                    showStatus(typingStatus, '获取客户端列表失败', 'error');
+                });
+            }
+            
+            // 加载客户端列表（用于管理）
+            function loadClientsForManagement() {
+                fetch(`${serverUrl}/api/clients`, {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(clients => {
+                    clientSelectModal.innerHTML = '';
+                    
+                    if (clients.length === 0) {
+                        const option = document.createElement('option');
+                        option.textContent = '没有在线客户端';
+                        option.disabled = true;
+                        clientSelectModal.appendChild(option);
+                        updateClientNameBtn.disabled = true;
+                        deleteClientBtn.disabled = true;
+                    } else {
+                        clients.forEach(client => {
+                            const option = document.createElement('option');
+                            option.value = client.client_id;
+                            option.textContent = `${client.name || '客户端 '+client.client_id.split('-')[0]} (最后在线: ${new Date(client.last_seen).toLocaleString()})`;
+                            clientSelectModal.appendChild(option);
+                        });
+                        updateClientNameBtn.disabled = false;
+                        deleteClientBtn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    console.error('获取客户端列表错误:', error);
+                    showStatus(clientManagementStatus, '获取客户端列表失败', 'error');
+                });
+            }
+            
+            // 检查登录状态
+            function checkLoginStatus() {
+                fetch(`${serverUrl}/api/clipboard`, {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // 已登录
+                        authContainer.style.display = 'none';
+                        clipboardContainer.style.display = 'block';
+                        loadClipboardItems();
+                        return response.json();
+                    } else {
+                        // 未登录
+                        authContainer.style.display = 'block';
+                        clipboardContainer.style.display = 'none';
+                        throw new Error('未登录');
+                    }
+                })
+                .catch(error => {
+                    console.log('检查登录状态:', error.message);
+                });
+            }
+            
+            // 加载剪贴板内容
+            function loadClipboardItems() {
+                fetch(`${serverUrl}/api/clipboard`, {
+                    method: 'GET',
+                    credentials: 'include'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('未登录或获取失败');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    clipboardList.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        clipboardList.innerHTML = '<p>暂无剪贴板内容</p>';
+                        return;
+                    }
+                    
+                    data.forEach(item => {
+                        const clipItem = document.createElement('div');
+                        clipItem.className = 'clipboard-item';
+                        
+                        const timestamp = new Date(item.timestamp);
+                        const formattedTime = `${timestamp.getFullYear()}-${(timestamp.getMonth()+1).toString().padStart(2, '0')}-${timestamp.getDate().toString().padStart(2, '0')} ${timestamp.getHours().toString().padStart(2, '0')}:${timestamp.getMinutes().toString().padStart(2, '0')}`;
+                        
+                        clipItem.innerHTML = `
+                            <div class="clipboard-content">${item.content}</div>
+                            <div class="clipboard-time">${formattedTime}</div>
+                            <div class="clipboard-actions">
+                                <button class="copy-btn" data-content="${encodeURIComponent(item.content)}">复制</button>
+                                <button class="delete-btn" data-id="${item.id}">删除</button>
+                            </div>
+                        `;
+                        
+                        clipboardList.appendChild(clipItem);
+                    });
+                    
+                    // 添加复制按钮事件
+                    document.querySelectorAll('.copy-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const content = decodeURIComponent(this.getAttribute('data-content'));
+                            copyToClipboard(content);
+                            this.textContent = '已复制';
+                            setTimeout(() => {
+                                this.textContent = '复制';
+                            }, 2000);
+                        });
+                    });
+                    
+                    // 添加删除按钮事件
+                    document.querySelectorAll('.delete-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const id = this.getAttribute('data-id');
+                            deleteClipboardItem(id);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('加载剪贴板内容错误:', error);
+                });
+            }
+            
+            // 删除剪贴板内容
+            function deleteClipboardItem(id) {
+                fetch(`${serverUrl}/api/clipboard/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === '删除成功') {
+                        loadClipboardItems();
+                    } else {
+                        alert(data.error || '删除失败');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除错误:', error);
+                    alert('网络错误，请稍后再试');
+                });
+            }
+            
+            // 复制到剪贴板
+            function copyToClipboard(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = 0;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+            }
+            
+            // 初始化
+            checkLoginStatus();
+            
+            // 标签切换
+            authTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    
+                    // 更新标签状态
+                    authTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    // 更新表单显示
+                    authForms.forEach(form => form.classList.remove('active'));
+                    document.getElementById(`${tabId}Form`).classList.add('active');
+                    
+                    // 清除状态消息
+                    loginStatus.textContent = '';
+                    loginStatus.className = 'status-message';
+                    registerStatus.textContent = '';
+                    registerStatus.className = 'status-message';
+                });
+            });
+            
+            // 登录功能
+            loginBtn.addEventListener('click', () => {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value.trim();
+                
+                if (!username || !password) {
+                    showStatus(loginStatus, '用户名和密码不能为空', 'error');
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === '登录成功') {
+                        showStatus(loginStatus, '登录成功，正在跳转...', 'success');
+                        setTimeout(() => {
+                            authContainer.style.display = 'none';
+                            clipboardContainer.style.display = 'block';
+                            userWelcome.textContent = `欢迎，${username}`;
+                            loadClipboardItems();
+                        }, 1000);
+                    } else {
+                        showStatus(loginStatus, data.error || '登录失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus(loginStatus, '网络错误，请稍后再试', 'error');
+                    console.error('登录错误:', error);
+                });
+            });
+            
+            // 注册功能
+            registerBtn.addEventListener('click', () => {
+                const username = document.getElementById('registerUsername').value.trim();
+                const password = document.getElementById('registerPassword').value.trim();
+                const confirmPassword = document.getElementById('confirmPassword').value.trim();
+                
+                if (!username || !password || !confirmPassword) {
+                    showStatus(registerStatus, '所有字段都必须填写', 'error');
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    showStatus(registerStatus, '两次输入的密码不一致', 'error');
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === '注册成功') {
+                        showStatus(registerStatus, '注册成功，请登录', 'success');
+                        setTimeout(() => {
+                            // 切换到登录标签
+                            authTabs[0].click();
+                            // 预填充用户名
+                            document.getElementById('loginUsername').value = username;
+                        }, 1500);
+                    } else {
+                        showStatus(registerStatus, data.error || '注册失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus(registerStatus, '网络错误，请稍后再试', 'error');
+                    console.error('注册错误:', error);
+                });
+            });
+            
+            // 退出登录
+            logoutBtn.addEventListener('click', () => {
+                // 清除会话
+                document.cookie = 'session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                
+                // 切换回登录界面
+                clipboardContainer.style.display = 'none';
+                authContainer.style.display = 'block';
+                
+                // 清空表单
+                document.getElementById('loginUsername').value = '';
+                document.getElementById('loginPassword').value = '';
+            });
+            
+            // 刷新剪贴板列表
+            refreshBtn.addEventListener('click', loadClipboardItems);
+            
+            // 查看客户端按钮
+            clientsBtn.addEventListener('click', () => {
+                // 切换模拟输入区域的显示状态
+                if (simulateTypingContainer.style.display === 'none') {
+                    simulateTypingContainer.style.display = 'block';
+                    loadClientsList();
+                } else {
+                    simulateTypingContainer.style.display = 'none';
+                }
+            });
+            
+            // 发送模拟输入指令
+            sendTypingBtn.addEventListener('click', () => {
+                const clientId = clientSelect.value;
+                const content = typingContent.value.trim();
+                const speed = parseInt(typingSpeedInput.value);
+                
+                if (!clientId) {
+                    showStatus(typingStatus, '请选择客户端', 'error');
+                    return;
+                }
+                
+                if (!content) {
+                    showStatus(typingStatus, '请输入内容', 'error');
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/simulate_typing`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        content: content,
+                        typing_speed: speed
+                    }),
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showStatus(typingStatus, `${data.message}，命令ID: ${data.command_id}`, 'success');
+                        // 清空输入框
+                        typingContent.value = '';
+                    } else {
+                        showStatus(typingStatus, data.error || '发送失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('发送模拟输入指令错误:', error);
+                    showStatus(typingStatus, '网络错误，请稍后再试', 'error');
+                });
+            });
+            
+            // 添加新剪贴板内容
+            addClipboardBtn.addEventListener('click', () => {
+                const content = newClipboardContent.value.trim();
+                
+                if (!content) {
+                    showStatus(addStatus, '内容不能为空', 'error');
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/clipboard`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ content, content_type: 'text' }),
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message === '添加成功') {
+                        showStatus(addStatus, '添加成功', 'success');
+                        newClipboardContent.value = '';
+                        loadClipboardItems();
+                    } else {
+                        showStatus(addStatus, data.error || '添加失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    showStatus(addStatus, '网络错误，请稍后再试', 'error');
+                    console.error('添加错误:', error);
+                });
+            });
+            
+            // 客户端管理功能
+            
+            // 打开客户端管理对话框
+            manageClientsBtn.addEventListener('click', () => {
+                clientManagementModal.style.display = 'block';
+                loadClientsForManagement();
+            });
+            
+            // 关闭对话框
+            closeClientModalBtn.addEventListener('click', () => {
+                clientManagementModal.style.display = 'none';
+            });
+            
+            // 修改客户端名称
+            updateClientNameBtn.addEventListener('click', () => {
+                const clientId = clientSelectModal.value;
+                const newName = clientNameInput.value.trim();
+                
+                if (!clientId) {
+                    showStatus(clientManagementStatus, '请选择客户端', 'error');
+                    return;
+                }
+                
+                if (!newName) {
+                    showStatus(clientManagementStatus, '请输入新名称', 'error');
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/clients/${clientId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name: newName }),
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showStatus(clientManagementStatus, data.message, 'success');
+                        loadClientsForManagement();
+                        loadClientsList(); // 刷新模拟输入区域的客户端列表
+                        clientNameInput.value = ''; // 清空输入框
+                    } else {
+                        showStatus(clientManagementStatus, data.error || '修改失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('修改客户端名称错误:', error);
+                    showStatus(clientManagementStatus, '网络错误，请稍后再试', 'error');
+                });
+            });
+            
+            // 删除客户端
+            deleteClientBtn.addEventListener('click', () => {
+                const clientId = clientSelectModal.value;
+                
+                if (!clientId) {
+                    showStatus(clientManagementStatus, '请选择客户端', 'error');
+                    return;
+                }
+                
+                if (!confirm('确定要删除这个客户端吗？此操作不可撤销。')) {
+                    return;
+                }
+                
+                fetch(`${serverUrl}/api/clients/${clientId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        showStatus(clientManagementStatus, data.message, 'success');
+                        loadClientsForManagement();
+                        loadClientsList(); // 刷新模拟输入区域的客户端列表
+                    } else {
+                        showStatus(clientManagementStatus, data.error || '删除失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除客户端错误:', error);
+                    showStatus(clientManagementStatus, '网络错误，请稍后再试', 'error');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
